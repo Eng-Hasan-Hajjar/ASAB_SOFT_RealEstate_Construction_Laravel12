@@ -1,0 +1,5 @@
+@extends('layouts.app')
+@section('title','ملفي وأمان الحساب')
+@section('content')
+<div class="page-heading"><div><span class="eyebrow">SECURITY</span><h1>الملف الشخصي</h1><p>يمكنك تحديث اسمك وكلمة مرور حسابك.</p></div></div><section class="panel edit-panel narrow-panel"><h3>تغيير كلمة المرور</h3><form action="{{ route('profile.update') }}" method="POST" class="form-stack">@csrf @method('PUT')<label class="field-label">اسم العرض</label><input name="name" value="{{ old('name',auth()->user()->name) }}" required><label class="field-label">كلمة المرور الحالية</label><input type="password" name="current_password" required autocomplete="current-password"><label class="field-label">كلمة المرور الجديدة (12 حرفاً على الأقل)</label><input type="password" name="new_password" minlength="12" required autocomplete="new-password"><label class="field-label">تأكيد الجديدة</label><input type="password" name="new_password_confirmation" minlength="12" required autocomplete="new-password"><button class="btn btn-primary">تحديث الملف</button></form></section>
+@endsection

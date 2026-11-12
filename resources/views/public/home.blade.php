@@ -1,0 +1,20 @@
+@extends('public.layout')
+@section('title','العقارات والمقاولات في السعودية والبحرين')
+@section('content')
+<section class="pub-hero"><div class="pub-container hero-grid"><div class="hero-content">
+<div class="eyebrow light"><span class="pulse-dot"></span> ASAB SOFT · REAL ESTATE PLATFORM</div>
+<h1>عقارك القادم<br><em>أقرب مما تتصور.</em></h1>
+<p>منصة تربط البحث عن العقارات بعمليات الإدارة والتأجير والمقاولات. تصفّح الوحدات المعروضة في السعودية والبحرين، واتخذ خطوتك بثقة ووضوح.</p>
+<form class="hero-search" method="GET" action="{{ route('public.catalogue') }}"><label><small>ماذا تبحث عنه؟</small><input name="q" aria-label="ابحث عن مدينة أو عقار" placeholder="المدينة، اسم العقار أو الحي..."></label><label><small>الدولة</small><select name="country" aria-label="الدولة"><option value="">كل الدول</option><option value="SA">السعودية</option><option value="BH">البحرين</option></select></label><button type="submit">ابحث عن عقار <span>←</span></button></form>
+<div class="hero-trust"><span>✧ بحث واضح حسب المعايير</span><span>⌂ وحدات متاحة فقط</span><span>✦ تجربة عربية بالكامل</span></div>
+</div><div class="hero-visual" aria-hidden="true"><div class="hero-glow"></div><div class="buildings"><div class="tower tower-one"></div><div class="tower tower-two"></div><div class="tower tower-three"></div><div class="tower tower-four"></div></div><div class="hero-floating first"><span>⌂</span><div><b>إدارة عقارية حديثة</b><small>قنوات موحدة للخدمة</small></div></div><div class="hero-floating second"><span>✦</span><div><b>عقارات منشورة</b><small>محدّثة من الشركات</small></div></div><div class="hero-ring one"></div><div class="hero-ring two"></div></div></div>
+<div class="pub-container bottom-hero"><span><b>{{ $metrics['listings'] }}</b> عقار منشور فعلياً</span><span><b>{{ $metrics['cities'] }}</b> مدينة تحتوي عروضاً</span><span><b>2</b> أسواق مستهدفة</span></div></section>
+<section class="pub-section"><div class="pub-container"><div class="section-head"><div><span class="eyebrow">LATEST LISTINGS</span><h2>العقارات المعروضة <i>حديثاً</i></h2><p>إعلانات منشورة من شركات المنصة، مع عرض الوحدات المتاحة فقط.</p></div><a class="outline-link" href="{{ route('public.catalogue') }}">عرض جميع العقارات ←</a></div>
+<div class="listing-grid">@forelse($latest as $property)@include('public.partials.card',['property'=>$property])@empty<div class="empty-results"><span>⌂</span><h3>لا توجد عقارات منشورة بعد</h3><p>يمكن لمالك المنصة إنشاء شركة، ثم إضافة عقاراتها ووحداتها ونشرها من لوحة الإعلانات.</p><a href="{{ route('login') }}" class="pub-btn">الدخول للإدارة</a></div>@endforelse</div></div></section>
+<section class="solutions" id="solutions"><div class="pub-container"><div class="section-head"><div><span class="eyebrow">OUR SOLUTIONS</span><h2>كل إدارة العقارات <i>في مكان واحد</i></h2><p>أدوات عملية للشركات والمستثمرين وفرق التشغيل.</p></div></div>
+<div class="solution-grid"><div class="solution-card"><span>01 / PROPERTY</span><div class="solution-icon">⌂</div><h3>إدارة الأصول والوحدات</h3><p>تنظيم العقارات ووحداتها ومساحاتها وأسعارها وتوافرها مع صلاحيات لكل شركة.</p></div>
+<div class="solution-card"><span>02 / LEASING</span><div class="solution-icon">▤</div><h3>الإيجارات والعقود</h3><p>إدارة المستأجرين والعقود والتجديدات والفواتير والمدفوعات والالتزامات.</p></div>
+<div class="solution-card"><span>03 / CONSTRUCTION</span><div class="solution-icon">⚒</div><h3>المقاولات والمشاريع</h3><p>إدارة المقاولين والمشاريع والمهام ونسب الإنجاز والميزانيات والمصروفات.</p></div>
+<div class="solution-card"><span>04 / AUTOMATION</span><div class="solution-icon">✧</div><h3>المساعد المحلي</h3><p>بحث داخلي وإجابات حول بيانات الشركة المصرح بها دون الاستعانة بخدمة ذكاء اصطناعي خارجية.</p></div></div></div></section>
+<section class="pub-cta" id="about"><div class="pub-container cta-inner"><div><span class="eyebrow light">ASAB SOFT FOR BUSINESS</span><h2>شركة واحدة. عمليات مترابطة.<br>رؤية أوضح.</h2><p>أنشئ مساحة عمل للشركة، وأضف العقارات والوحدات، وحدّد ما يظهر لزوار السوق.</p></div><a class="cta-link" href="{{ route('login') }}">دخول إدارة الشركات ←</a></div></section>
+@endsection

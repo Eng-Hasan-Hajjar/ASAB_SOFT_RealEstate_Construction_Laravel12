@@ -1,0 +1,7 @@
+@extends('layouts.app')
+@section('title','الفواتير والتحصيل')
+@section('content')
+<div class="page-heading"><div><span class="eyebrow">FINANCE / BILLING</span><h1>الفواتير والتحصيل</h1><p>إصدار الفواتير وتحصيل الدفعات وإظهار الرصيد المتبقي لكل فاتورة.</p></div>@if(in_array(\App\Support\Workspace::role(),['company_admin','manager','accountant'],true))<a href="{{ route('invoices.create') }}" class="btn btn-primary">+ فاتورة جديدة</a>@endif</div>
+<div class="panel table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>العميل</th><th>الإصدار</th><th>الاستحقاق</th><th>المبلغ</th><th>الرصيد</th><th>الحالة</th><th></th></tr></thead><tbody>
+@forelse($invoices as $i)<tr><td class="cell-strong">{{ $i->number }}</td><td>{{ $i->contact?->name }}</td><td>{{ $i->issued_on }}</td><td>{{ $i->due_on }}</td><td dir="ltr">{{ \App\Support\Workspace::company()->money($i->amount) }}</td><td dir="ltr">{{ \App\Support\Workspace::company()->money($i->balance) }}</td><td><span class="status-pill">{{ ['unpaid'=>'غير مسددة','partially_paid'=>'جزئية','paid'=>'مسددة','void'=>'ملغاة'][$i->status]??$i->status }}</span></td><td><a href="{{ route('invoices.show',$i) }}" class="table-action">تفاصيل ←</a></td></tr>@empty<tr><td colspan="8"><div class="empty-state">لا توجد فواتير بعد.</div></td></tr>@endforelse</tbody></table></div>{{ $invoices->links() }}</div>
+@endsection

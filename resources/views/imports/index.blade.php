@@ -1,0 +1,13 @@
+@extends('layouts.app')
+@section('title','مراجعة ملفات Excel')
+@section('content')
+<div class="page-heading"><div><span class="eyebrow">LEGACY DATA TRANSITION</span><h1>استيراد البيانات للمراجعة</h1><p>مساحة داخلية مؤمنة لمعاينة ملفات العقارات والتحصيل النقدي والبنكي قبل تحويلها إلى سجلات تشغيلية.</p></div><span class="local-pill">لا اعتماد تلقائياً</span></div>
+<div class="content-grid"><section class="panel"><h3>رفع ملف Excel أو CSV</h3><form action="{{ route('imports.upload') }}" method="POST" enctype="multipart/form-data" class="form-stack">@csrf
+<label class="field-label">الملف *</label><input type="file" name="file" accept=".xlsx,.csv,.txt" required>
+<label class="field-label">تصنيف الملف *</label><select name="profile"><option value="unit_history">سجل وحدة/عقار وتاريخ إيجارات</option><option value="cash_income">دخل وتحويلات الصندوق — كاش</option><option value="bank_income">حركات الدخل البنكي</option></select>
+<label class="field-label">اسم العقار في الأصل (اختياري)</label><input name="property_label" placeholder="مثال: عمارة العقربية">
+<label class="field-label">الوحدة (اختياري)</label><input name="unit_label" placeholder="مثال: شقة (101)"><button class="btn btn-primary" type="submit">فحص وحفظ في منطقة المراجعة</button>
+</form><div class="soft-note">تُحفظ الصفوف في قاعدة البيانات مشفرة بآلية Laravel بعد الرفع. لا تُنشأ عقود أو دفعات من بيانات غير مؤكدة؛ أي تاريخ غامض أو سطر مكرر يحتاج تسوية وموافقة قبل الترحيل.</div></section>
+<section class="panel"><h3>إجراءات نقل البيانات</h3><div class="process-list"><p><b>1.</b> رفع ملف كل مبنى أو كشف دخل واكتشاف أوراق العمل.</p><p><b>2.</b> مراجعة الحقول المتكررة والصيغ والتواريخ.</p><p><b>3.</b> مطابقة العقار والوحدة والعميل مع سجلات النظام.</p><p><b>4.</b> اعتماد رصيد افتتاحي وحركات غير مكررة.</p><p><b>5.</b> إدخال السجلات النهائية بعد التأكد من صحتها.</p></div><p class="muted">يُفضّل رفع نسخة عمل منفصلة عن الملفات الأصلية وبدون نشرها في مستودع GitHub.</p></section></div>
+<section class="panel" style="margin-top:22px"><div class="panel-head"><h3>دفعات الاستيراد السابقة</h3></div><div class="table-scroll"><table class="data-table"><thead><tr><th>الملف</th><th>النوع</th><th>عدد الصفوف</th><th>تحذيرات</th><th>وقت الرفع</th><th>إجراء</th></tr></thead><tbody>@forelse($batches as $b)<tr><td>{{ $b->source_filename }}</td><td>{{ ['unit_history'=>'سجل عقار','cash_income'=>'دخل نقدي','bank_income'=>'دخل بنكي'][$b->profile]??$b->profile }}</td><td>{{ $b->rows_total }}</td><td>{{ $b->rows_flagged }}</td><td>{{ $b->created_at->format('Y-m-d H:i') }}</td><td><a class="text-link" href="{{ route('imports.show',$b) }}">مراجعة الصفوف ←</a></td></tr>@empty<tr><td colspan="6">لم تُرفع ملفات بعد.</td></tr>@endforelse</tbody></table></div>{{ $batches->links() }}</section>
+@endsection

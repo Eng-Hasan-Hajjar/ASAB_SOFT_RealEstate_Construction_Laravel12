@@ -1,0 +1,14 @@
+{
+  "$schema": "https://getcomposer.org/schema.json",
+  "name": "asab-soft/real-estate-construction-platform",
+  "description": "ASAB SOFT multi-company property, rentals and construction operations (Saudi Arabia & Bahrain)",
+  "type": "project",
+  "license": "proprietary",
+  "require": {"php": "^8.2", "laravel/framework": "^12.0", "laravel/tinker": "^2.10.1"},
+  "require-dev": {"fakerphp/faker":"^1.23", "nunomaduro/collision":"^8.6", "phpunit/phpunit":"^11.5", "mockery/mockery":"^1.6"},
+  "autoload": {"psr-4": {"App\\": "app/", "Database\\Factories\\": "database/factories/", "Database\\Seeders\\": "database/seeders/"}},
+  "autoload-dev": {"psr-4": {"Tests\\": "tests/"}},
+  "scripts": {"post-autoload-dump": ["Illuminate\\Foundation\\ComposerScripts::postAutoloadDump", "@php artisan package:discover --ansi"], "test": ["@php artisan test"]},
+  "config": {"optimize-autoloader": true,"preferred-install":"dist","sort-packages":true},
+  "minimum-stability":"stable", "prefer-stable":true
+}

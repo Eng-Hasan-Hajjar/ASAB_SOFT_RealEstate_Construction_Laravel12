@@ -1,0 +1,64 @@
+<?php
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\{AuthController,DashboardController,ModuleController,LeaseController,InvoiceController,AssistantController,PlatformController,StaffController,ProfileController,PublicPropertyController,MarketplaceController,FinanceController,ReportsController,ReservationController,ImportController,BillingController};
+
+// Public website — only explicitly published properties and available listed units.
+Route::get('/',[PublicPropertyController::class,'home'])->name('public.home');
+Route::get('/properties',[PublicPropertyController::class,'index'])->name('public.catalogue');
+Route::get('/properties/{property}',[PublicPropertyController::class,'show'])->whereNumber('property')->name('public.property');
+Route::post('/properties/{property}/inquire',[PublicPropertyController::class,'inquire'])->whereNumber('property')->middleware('throttle:5,1')->name('public.inquire');
+Route::middleware('guest')->group(function(){Route::get('/login',[AuthController::class,'create'])->name('login');Route::post('/login',[AuthController::class,'store'])->middleware('throttle:6,1')->name('login.store');});
+Route::middleware(['auth','active'])->group(function(){
+ Route::post('/logout',[AuthController::class,'destroy'])->name('logout');
+ Route::get('/profile',[ProfileController::class,'edit'])->name('profile.edit');Route::put('/profile',[ProfileController::class,'update'])->name('profile.update');
+ Route::middleware('role:super_admin')->prefix('platform')->name('platform.')->group(function(){
+  Route::get('/',[PlatformController::class,'index'])->name('index');
+  Route::post('/companies',[PlatformController::class,'store'])->name('companies.store');
+  Route::patch('/companies/{company}/toggle',[PlatformController::class,'toggle'])->name('companies.toggle');
+  Route::post('/companies/{company}/enter',[PlatformController::class,'enter'])->name('enter');
+  Route::post('/leave',[PlatformController::class,'leave'])->name('leave');
+ });
+ Route::middleware('role:company_admin,manager,agent,accountant,viewer')->group(function(){
+  Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard');
+  Route::get('/assistant',[AssistantController::class,'index'])->name('assistant.index');Route::post('/assistant/ask',[AssistantController::class,'ask'])->middleware('throttle:30,1')->name('assistant.ask');
+  Route::get('/leases',[LeaseController::class,'index'])->name('leases.index');Route::get('/leases/create',[LeaseController::class,'create'])->name('leases.create');Route::post('/leases',[LeaseController::class,'store'])->name('leases.store');
+  Route::get('/leases/{lease}',[LeaseController::class,'show'])->name('leases.show');Route::patch('/leases/{lease}/close',[LeaseController::class,'close'])->name('leases.close');
+  Route::get('/finance',[FinanceController::class,'index'])->name('finance.index');
+  Route::post('/finance/accounts',[FinanceController::class,'account'])->name('finance.accounts.store');
+  Route::post('/finance/entries',[FinanceController::class,'entry'])->name('finance.entries.store');
+  Route::get('/reports',[ReportsController::class,'index'])->name('reports.index');
+  Route::get('/reports/export',[ReportsController::class,'export'])->name('reports.export');
+  Route::get('/billing',[BillingController::class,'index'])->name('billing.index');
+  Route::post('/billing/generate',[BillingController::class,'generate'])->name('billing.generate');
+  Route::get('/reservations',[ReservationController::class,'index'])->name('reservations.index');
+  Route::post('/reservations',[ReservationController::class,'store'])->name('reservations.store');
+  Route::patch('/reservations/{reservation}/status',[ReservationController::class,'status'])->name('reservations.status');
+  Route::middleware('role:company_admin,manager,accountant')->group(function(){
+   Route::get('/imports',[ImportController::class,'index'])->name('imports.index');
+   Route::post('/imports',[ImportController::class,'upload'])->name('imports.upload');
+   Route::get('/imports/{batch}',[ImportController::class,'show'])->name('imports.show');
+   Route::delete('/imports/{batch}',[ImportController::class,'delete'])->name('imports.delete');
+  });
+  Route::get('/invoices',[InvoiceController::class,'index'])->name('invoices.index');Route::get('/invoices/create',[InvoiceController::class,'create'])->name('invoices.create');Route::post('/invoices',[InvoiceController::class,'store'])->name('invoices.store');
+  Route::get('/invoices/{invoice}',[InvoiceController::class,'show'])->name('invoices.show');Route::post('/invoices/{invoice}/payments',[InvoiceController::class,'pay'])->name('invoices.pay');
+  Route::middleware('role:company_admin,manager')->group(function(){Route::get('/staff',[StaffController::class,'index'])->name('staff.index');Route::post('/staff',[StaffController::class,'store'])->name('staff.store');Route::patch('/staff/{user}/toggle',[StaffController::class,'toggle'])->name('staff.toggle');});
+  Route::get('/listings',[MarketplaceController::class,'index'])->name('listings.index');
+  Route::get('/listings/{property}/edit',[MarketplaceController::class,'edit'])->whereNumber('property')->name('listings.edit');
+  Route::post('/listings/{property}/settings',[MarketplaceController::class,'save'])->whereNumber('property')->name('listings.save');
+  Route::post('/listings/{property}/publish',[MarketplaceController::class,'toggle'])->whereNumber('property')->name('listings.toggle');
+  Route::post('/listings/{property}/featured',[MarketplaceController::class,'feature'])->whereNumber('property')->name('listings.feature');
+  Route::put('/listings/{property}/units/{unit}',[MarketplaceController::class,'unit'])->whereNumber('property')->whereNumber('unit')->name('listings.unit');
+  Route::post('/listings/{property}/photos',[MarketplaceController::class,'upload'])->whereNumber('property')->name('listings.photo');
+  Route::post('/listings/{property}/photos/{media}/cover',[MarketplaceController::class,'cover'])->whereNumber('property')->whereNumber('media')->name('listings.cover');
+  Route::delete('/listings/{property}/photos/{media}',[MarketplaceController::class,'deleteImage'])->whereNumber('property')->whereNumber('media')->name('listings.photo.delete');
+  Route::get('/inquiries',[MarketplaceController::class,'inquiries'])->name('inquiries.index');
+  Route::patch('/inquiries/{inquiry}',[MarketplaceController::class,'inquiryUpdate'])->whereNumber('inquiry')->name('inquiries.update');
+  Route::get('/manage/{module}',[ModuleController::class,'index'])->name('modules.index');
+  Route::get('/manage/{module}/create',[ModuleController::class,'create'])->name('modules.create');
+  Route::post('/manage/{module}',[ModuleController::class,'store'])->name('modules.store');
+  Route::get('/manage/{module}/{id}',[ModuleController::class,'show'])->whereNumber('id')->name('modules.show');
+  Route::get('/manage/{module}/{id}/edit',[ModuleController::class,'edit'])->whereNumber('id')->name('modules.edit');
+  Route::put('/manage/{module}/{id}',[ModuleController::class,'update'])->whereNumber('id')->name('modules.update');
+  Route::delete('/manage/{module}/{id}',[ModuleController::class,'destroy'])->whereNumber('id')->name('modules.destroy');
+ });
+});
