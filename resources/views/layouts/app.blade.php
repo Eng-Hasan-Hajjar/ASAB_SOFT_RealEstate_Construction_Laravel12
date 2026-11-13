@@ -36,6 +36,10 @@
       <a class="nav-link {{ request()->is('manage/'.$mod.'*')?'active':'' }}" href="{{ route('modules.index',$mod) }}"><span class="nav-emoji">{{ ['properties'=>'⌂','units'=>'▤','contacts'=>'♙'][$mod] }}</span>{{ config('modules.'.$mod.'.title') }}</a>
       @endif
     @endforeach
+    <a class="nav-link {{ request()->routeIs('asab.history.rentals')?'active':'' }}" href="{{ route('asab.history.rentals') }}"><span class="nav-emoji">▤</span> السجل التاريخي للوحدات <span class="nav-tag">Excel</span></a>
+    @if(in_array(\App\Support\Workspace::role(),['company_admin','manager','accountant'],true))
+    <a class="nav-link {{ request()->routeIs('asab.history.finance')?'active':'' }}" href="{{ route('asab.history.finance') }}"><span class="nav-emoji">◉</span> دفتر التحصيل المستورد <span class="nav-tag">Excel</span></a>
+    @endif
     <a class="nav-link {{ request()->routeIs('leases.*')?'active':'' }}" href="{{ route('leases.index') }}"><span class="nav-emoji">▣</span> عقود الإيجار</a>
     <a class="nav-link {{ request()->routeIs('invoices.*')?'active':'' }}" href="{{ route('invoices.index') }}"><span class="nav-emoji">＄</span> الفواتير والتحصيل</a>
     <a class="nav-link {{ request()->routeIs('reservations.*')?'active':'' }}" href="{{ route('reservations.index') }}"><span class="nav-emoji">◷</span> الحجوزات والإشغال</a>

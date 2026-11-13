@@ -1,5 +1,6 @@
 <?php
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AsabImportedHistoryController;
 use App\Http\Controllers\{AuthController,DashboardController,ModuleController,LeaseController,InvoiceController,AssistantController,PlatformController,StaffController,ProfileController,PublicPropertyController,MarketplaceController,FinanceController,ReportsController,ReservationController,ImportController,BillingController};
 
 // Public website — only explicitly published properties and available listed units.
@@ -20,6 +21,8 @@ Route::middleware(['auth','active'])->group(function(){
  });
  Route::middleware('role:company_admin,manager,agent,accountant,viewer')->group(function(){
   Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard');
+  Route::get('/asab/history/rentals',[AsabImportedHistoryController::class,'rentals'])->name('asab.history.rentals');
+  Route::middleware('role:company_admin,manager,accountant')->get('/asab/history/finance',[AsabImportedHistoryController::class,'finance'])->name('asab.history.finance');
   Route::get('/assistant',[AssistantController::class,'index'])->name('assistant.index');Route::post('/assistant/ask',[AssistantController::class,'ask'])->middleware('throttle:30,1')->name('assistant.ask');
   Route::get('/leases',[LeaseController::class,'index'])->name('leases.index');Route::get('/leases/create',[LeaseController::class,'create'])->name('leases.create');Route::post('/leases',[LeaseController::class,'store'])->name('leases.store');
   Route::get('/leases/{lease}',[LeaseController::class,'show'])->name('leases.show');Route::patch('/leases/{lease}/close',[LeaseController::class,'close'])->name('leases.close');

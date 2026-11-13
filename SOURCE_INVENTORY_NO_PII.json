@@ -1,0 +1,16 @@
+{
+  "workbooks": 14,
+  "worksheets": 398,
+  "original_nonempty_rows": 18647,
+  "source_property_workbooks": 12,
+  "unit_sheets": 391,
+  "tenant_candidate_rows": 1765,
+  "estimated_distinct_exact_name_phone_contacts": 929,
+  "estimated_rental_history_records": 12064,
+  "estimated_draft_leases": 16,
+  "main_cash_income_records": 50,
+  "main_bank_income_records": 413,
+  "cash_expense_records": 129,
+  "auxiliary_bank_review_records": 5,
+  "notes": "Historical records need review. Nothing imported to financial ledger automatically."
+}
