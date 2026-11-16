@@ -1,6 +1,6 @@
 <?php
 namespace Tests\Feature;
-use App\Models\{Company,User,Property,Unit,Contact,Lease,Invoice};
+use App\Models\{Company,User,Property,Unit,Contact,Lease,Invoice,FinancialAccount};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 class PlatformSecurityTest extends TestCase {
@@ -40,7 +40,8 @@ class PlatformSecurityTest extends TestCase {
  public function test_payment_cannot_exceed_remaining_balance():void {
   $a=$this->company('alpha');$staff=$this->staff($a);$tenant=Contact::create(['company_id'=>$a->id,'name'=>'Tenant','type'=>'tenant']);
   $invoice=Invoice::create(['company_id'=>$a->id,'contact_id'=>$tenant->id,'number'=>'INV-001','issued_on'=>'2026-11-01','due_on'=>'2026-12-01','amount'=>100,'status'=>'unpaid']);
-  $this->actingAs($staff)->post('/invoices/'.$invoice->id.'/payments',['amount'=>200,'paid_on'=>'2026-11-02','method'=>'cash'])->assertSessionHasErrors('amount');
+  $cash=FinancialAccount::create(['company_id'=>$a->id,'name'=>'Cash','type'=>'cash','currency'=>'SAR','is_active'=>true]);
+  $this->actingAs($staff)->post('/invoices/'.$invoice->id.'/payments',['amount'=>200,'paid_on'=>'2026-11-02','method'=>'cash','financial_account_id'=>$cash->id])->assertSessionHasErrors('amount');
   $this->assertDatabaseCount('payments',0);
  }
 }

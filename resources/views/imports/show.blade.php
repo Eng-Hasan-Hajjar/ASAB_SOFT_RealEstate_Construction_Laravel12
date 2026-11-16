@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title','مراجعة دفعة Excel')
+@section('title','مراجعة عملية استيراد')
 @section('content')
 <div class="page-heading"><div><span class="eyebrow">IMPORT PREVIEW</span><h1>{{ $record->source_filename }}</h1><p>هذه معاينة للصفوف المصدرية، وليست عقوداً أو دفعات مُرحّلة إلى الحسابات.</p></div><a href="{{ route('imports.index') }}" class="btn btn-outline">← جميع الدفعات</a></div>
 <div class="stats-grid reports-stats"><div class="stat-card"><span>نوع المصدر</span><strong class="small-value">{{ $record->profile }}</strong></div><div class="stat-card"><span>عدد الصفوف</span><strong>{{ $record->rows_total }}</strong></div><div class="stat-card"><span>صفوف تحتاج تدقيقاً</span><strong>{{ $record->rows_flagged }}</strong></div><div class="stat-card"><span>الحالة</span><strong class="small-value">بانتظار مراجعة</strong></div></div>

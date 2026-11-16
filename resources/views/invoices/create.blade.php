@@ -8,5 +8,7 @@
 <div class="form-field"><label>المبلغ *</label><input type="number" step="0.001" min="0.001" name="amount" value="{{ old('amount') }}" required></div>
 <div class="form-field"><label>تاريخ الإصدار *</label><input type="date" name="issued_on" value="{{ old('issued_on',today()->toDateString()) }}" required></div>
 <div class="form-field"><label>تاريخ الاستحقاق *</label><input type="date" name="due_on" value="{{ old('due_on',today()->addMonth()->toDateString()) }}" required></div>
+<div class="form-field"><label>بداية فترة الإيجار (اختياري)</label><input type="date" name="period_start" value="{{ old('period_start') }}"></div>
+<div class="form-field"><label>نهاية فترة الإيجار (اختياري)</label><input type="date" name="period_end" value="{{ old('period_end') }}"></div>
 <div class="form-field wide"><label>البيان</label><textarea name="description" rows="3">{{ old('description') }}</textarea></div></div><div class="form-actions"><button class="btn btn-primary">حفظ وإصدار الفاتورة</button></div></form>
 @endsection

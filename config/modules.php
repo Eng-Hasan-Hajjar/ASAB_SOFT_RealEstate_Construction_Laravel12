@@ -22,7 +22,7 @@ return [
   'name'=>$t('الاسم الكامل',true),'type'=>$s('النوع',['tenant'=>'مستأجر','owner'=>'مالك','buyer'=>'مشتري','supplier'=>'مورد','other'=>'آخر']),
   'phone'=>$t('الجوال'),'nationality'=>$t('الجنسية'),'identity_reference'=>$t('مرجع الهوية (اختياري، داخلي)'),'email'=>['label'=>'البريد الإلكتروني','type'=>'email'],'city'=>$t('المدينة'),
   'country_code'=>$s('الدولة',['SA'=>'السعودية','BH'=>'البحرين'],false),'notes'=>$a('ملاحظات داخلية')],
-  'columns'=>['name','type','phone','email','city']],
+  'columns'=>['name','type','nationality','phone','email','city']],
  'tickets'=>['title'=>'طلبات الصيانة','singular'=>'طلب صيانة','model'=>App\Models\MaintenanceTicket::class,'icon'=>'wrench','description'=>'متابعة البلاغات والتكليفات والمواعيد','fields'=>[
   'title'=>$t('عنوان البلاغ',true),'property_id'=>$r('العقار','properties',true),'unit_id'=>$r('الوحدة','units'),'contact_id'=>$r('مقدم الطلب','contacts'),
   'assigned_to'=>$r('الموظف المسؤول','users'),'priority'=>$s('الأولوية',['low'=>'منخفضة','medium'=>'متوسطة','high'=>'عالية','urgent'=>'عاجلة']),

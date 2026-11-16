@@ -41,6 +41,7 @@ class ReservationController extends CompanyBaseController {
    $record=Reservation::where('company_id',$c)->lockForUpdate()->findOrFail($reservation);
    abort_unless(in_array($record->status,['pending','confirmed'],true),422,'لا يمكن تغيير حجز مغلق.');
    $unit=Unit::where('company_id',$c)->lockForUpdate()->findOrFail($record->unit_id);
+   if($data['status']==='confirmed' && in_array($unit->status,['inactive','maintenance'],true))throw ValidationException::withMessages(['unit_id'=>'الوحدة غير قابلة للحجز.']);
    if($data['status']==='confirmed')$this->assertNoConflict($c,$unit->id,$record->check_in->format('Y-m-d'),$record->check_out->format('Y-m-d'),$record->id);
    $record->update(['status'=>$data['status']]);
   });Audit::record('updated','reservations',$reservation,'تغيير حالة حجز');return back()->with('success','تم تحديث حالة الحجز.');

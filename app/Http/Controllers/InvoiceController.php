@@ -14,11 +14,19 @@ class InvoiceController extends CompanyBaseController {
   $this->canWrite();$c=$this->companyId();$data=$request->validate([
    'contact_id'=>['required','integer',Rule::exists('contacts','id')->where('company_id',$c)],
    'lease_id'=>['nullable','integer',Rule::exists('leases','id')->where('company_id',$c)],
-   'amount'=>['required','numeric','gt:0','decimal:0,3'],'issued_on'=>['required','date_format:Y-m-d'],
+   'period_start'=>['nullable','required_with:period_end','date_format:Y-m-d'],'period_end'=>['nullable','required_with:period_start','date_format:Y-m-d','after_or_equal:period_start'],
+   'amount'=>['required','numeric','gt:0','max:999999999999.999','decimal:0,3'],'issued_on'=>['required','date_format:Y-m-d'],
    'due_on'=>['required','date_format:Y-m-d','after_or_equal:issued_on'],'description'=>['nullable','string','max:3000'],
   ]);
+  if(!empty($data['period_start']) && empty($data['lease_id']))throw ValidationException::withMessages(['lease_id'=>'الفترة الإيجارية تحتاج إلى عقد.']);
   if(!empty($data['lease_id'])) {
    $lease=Lease::where('company_id',$c)->findOrFail($data['lease_id']);
+   if(!in_array($lease->status,['active','ended'],true))throw ValidationException::withMessages(['lease_id'=>'لا يمكن إصدار فاتورة لمسودة أو عقد ملغى.']);
+   if(!empty($data['period_start'])){
+    if($data['period_start']<$lease->starts_on||$data['period_end']>$lease->ends_on)throw ValidationException::withMessages(['period_start'=>'فترة الفاتورة يجب أن تقع ضمن مدة العقد.']);
+    if(Invoice::where('company_id',$c)->where('lease_id',$lease->id)->where('period_start',$data['period_start'])->exists())
+      throw ValidationException::withMessages(['period_start'=>'توجد فاتورة مرتبطة ببداية الفترة نفسها لهذا العقد.']);
+   }
    if((int)$lease->contact_id!==(int)$data['contact_id'])throw ValidationException::withMessages(['contact_id'=>'المستأجر لا يطابق المستأجر المرتبط بالعقد.']);
   }
   $data['number']='INV-'.now()->format('ymd').'-'.strtoupper(bin2hex(random_bytes(4)));

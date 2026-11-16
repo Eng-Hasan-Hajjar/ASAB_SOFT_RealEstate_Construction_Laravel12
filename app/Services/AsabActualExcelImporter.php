@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\{Company, Contact, ImportBatch, Lease, Property, Unit};
 use DateTimeImmutable;
+use App\Support\{ExcelMoney,RentalSheetRows};
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -28,6 +29,7 @@ final class AsabActualExcelImporter
             throw new RuntimeException('The 14 Saudi workbooks must be imported into a Saudi / SAR company.');
         }
         $this->companyId = (int) $company->id;
+        $this->properties=$this->units=$this->contacts=[];
         $this->counter = array_fill_keys([
             'workbooks', 'worksheets', 'archived_rows', 'properties', 'units', 'contact_links',
             'contacts_created', 'rental_history', 'finance_history', 'draft_leases',
@@ -77,6 +79,42 @@ final class AsabActualExcelImporter
         return $this->counter;
     }
 
+    public function receipts(Company $company,bool $apply): array
+    {
+        if ($company->country_code !== 'SA' || $company->currency !== 'SAR') {
+            throw new RuntimeException('Excel receipts require a Saudi / SAR company.');
+        }
+        $this->companyId=(int)$company->id;
+        $this->properties=[];
+        $this->counter=array_fill_keys(['archived_rows','finance_history','cash_receipts','bank_receipts','cash_expenses','bank_auxiliary'],0);
+        $root=storage_path('app/asab-private-import');
+        $manifest=$this->readJson($root.'/manifest.json');
+        if (($manifest['version']??null)!==1 || count($manifest['sources']??[])!==14) throw new RuntimeException('Expected the original version-1 private archive.');
+        $books=[];
+        foreach ($manifest['sources'] as $spec) {
+            if (($spec['kind']??null)!=='income') continue;
+            $file=(string)($spec['file']??'');
+            if (!preg_match('/^source_\d{2}\.json\.gz$/D',$file) || !is_file($path=$root.'/'.$file)
+                || !hash_equals((string)$spec['archive_sha256'],hash_file('sha256',$path))) throw new RuntimeException('Invalid private finance snapshot.');
+            $raw=gzdecode(file_get_contents($path));
+            if ($raw===false) throw new RuntimeException('Could not read the Excel snapshot.');
+            $book=json_decode($raw,true,512,JSON_THROW_ON_ERROR);
+            if (!hash_equals((string)$spec['source_sha256'],(string)($book['source_sha256']??''))
+                || count($book['sheets']??[])!==(int)$spec['sheet_count']
+                || array_sum(array_map(fn($sheet)=>count($sheet['rows']??[]),$book['sheets']))!==(int)$spec['nonempty_rows'])
+                throw new RuntimeException('Finance source metadata mismatch.');
+            $books[]=[$spec,$book];
+        }
+        if(count($books)!==2)throw new RuntimeException('Expected two income workbooks.');
+        foreach($books as [$spec,$book]) {
+            if (!$apply) {$this->estimateBook($spec,$book,false);continue;}
+            DB::transaction(function()use($company,$spec,$book){
+                foreach($book['sheets'] as $sheet)$this->importFinancialSheet($company,(string)$spec['source_label'],$sheet,true);
+            });
+        }
+        return array_intersect_key($this->counter,array_flip(['cash_receipts','bank_receipts']));
+    }
+
     private function estimateBook(array $spec, array $book, bool $withDrafts): void
     {
         $this->counter['archived_rows'] += (int) $spec['nonempty_rows'];
@@ -102,12 +140,7 @@ final class AsabActualExcelImporter
                         $this->counter['draft_leases']++;
                     }
                 }
-                foreach ($sheet['rows'] as $row) {
-                    $sequence = trim((string) ($row['cells']['A'] ?? ''));
-                    if (preg_match('/^\d{1,5}$/', $sequence) || isset($candidates[(int) $row['row']])) {
-                        $this->counter['rental_history']++;
-                    }
-                }
+                foreach(RentalSheetRows::explain($sheet,$candidates) as $entry)$this->counter['rental_history']++;
             }
             if ($spec['kind'] === 'income') {
                 $bank = str_contains((string) $sheet['name'], 'بنكي');
@@ -251,39 +284,124 @@ final class AsabActualExcelImporter
                 if ($lease->wasRecentlyCreated) $this->counter['draft_leases']++;
             }
         }
-        $buffer = [];
-        foreach ($sheet['rows'] as $row) {
-            $cells = $row['cells'] ?? [];
-            $seq = trim((string) ($cells['A'] ?? ''));
-            $rowIndex = (int) $row['row'];
-            if (! preg_match('/^\d{1,5}$/', $seq) && ! isset($candidates[$rowIndex])) continue;
-            $person = $candidates[$rowIndex] ?? null;
-            $rawFrom = trim((string) ($cells['F'] ?? ''));
-            $rawTo = trim((string) ($cells['G'] ?? ''));
-            $buffer[] = [
-                'company_id' => $company->id, 'property_id' => $property->id, 'unit_id' => $unit->id,
-                'contact_id' => $person['contact_id'] ?? null,
-                'source_key' => $this->rowHash($source, $sheetName, $rowIndex, 'rental'),
-                'source_file' => $source, 'source_sheet' => mb_substr($sheetName, 0, 140),
-                'source_row' => $rowIndex, 'sequence_label' => mb_substr($seq, 0, 40) ?: null,
-                'tenant_label' => ($person ? mb_substr((string) ($person['candidate']['name'] ?? ''), 0, 255) : null),
-                'reference' => mb_substr((string) ($cells['E'] ?? ''), 0, 120) ?: null,
-                'date_from_source' => mb_substr($rawFrom, 0, 100) ?: null,
-                'date_to_source' => mb_substr($rawTo, 0, 100) ?: null,
-                'starts_on' => $this->explicitDate($rawFrom), 'ends_on' => $this->explicitDate($rawTo),
-                'source_amount' => $this->money($cells['H'] ?? null),
-                'source_deposit' => $this->money($cells['I'] ?? null),
-                'record_type' => $person ? 'tenant' : 'period', 'review_status' => 'needs_review',
-                'memo' => mb_substr(trim((string) ($cells['L'] ?? $cells['K'] ?? '')), 0, 2000) ?: null,
-                'encrypted_source' => Crypt::encryptString(json_encode($cells, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)),
-                'created_at' => now(), 'updated_at' => now(),
-            ];
-            if (count($buffer) >= 150) $this->insertBatch('asab_rental_history', $buffer, 'rental_history');
-        }
-        $this->insertBatch('asab_rental_history', $buffer, 'rental_history');
+        $counts=$this->interpretSheet($company,$property,$unit,$source,$sheet,$candidates,true);
+        $this->counter['rental_history']+=$counts['created'];
     }
 
-    private function importFinancialSheet(Company $company, string $source, array $sheet): void
+    /** Rebuild inference for an already imported company, without touching other operational data. */
+    public function repairRentals(Company $company,bool $apply): array
+    {
+        if($company->country_code!=='SA'||$company->currency!=='SAR')throw new RuntimeException('اختر مساحة الشركة السعودية التي استوردت السجلات الأصلية.');
+        $this->companyId=(int)$company->id;
+        $root=storage_path('app/asab-private-import');
+        $manifest=$this->readJson($root.'/manifest.json');
+        if(($manifest['version']??null)!==1||count($manifest['sources']??[])!==14)throw new RuntimeException('الأرشيف الأصلي غير مكتمل.');
+        $jobs=[];
+        foreach($manifest['sources'] as $spec){
+            if(($spec['kind']??null)!=='property')continue;
+            $file=(string)($spec['file']??'');$path=$root.'/'.$file;
+            if(!preg_match('/^source_\d{2}\.json\.gz$/D',$file)||!is_file($path)||!hash_equals((string)$spec['archive_sha256'],hash_file('sha256',$path)))
+                throw new RuntimeException('أحد ملفات سجل الإيجار مفقود أو لا يطابق البصمة.');
+            $book=json_decode((string)gzdecode((string)file_get_contents($path)),true,512,JSON_THROW_ON_ERROR);
+            if(($book['source_sha256']??null)!==$spec['source_sha256']||count($book['sheets']??[])!==(int)$spec['sheet_count'])
+                throw new RuntimeException('بيانات ورقة الإيجار لا تطابق الفهرس.');
+            $source=(string)$spec['source_label'];
+            $property=Property::where('company_id',$company->id)->where('name',$source)->sole();
+            $units=Unit::where('company_id',$company->id)->where('property_id',$property->id)->get()->keyBy('code');
+            foreach($book['sheets'] as $sheet){
+                if(empty($sheet['is_unit_sheet']))continue;
+                $unit=$units[$sheet['name']]??null;
+                if(!$unit)throw new RuntimeException('وحدة من السجل الأصلي لم تعد تطابق رمزها، راجع أسماء الأصول قبل إعادة الربط.');
+                $jobs[]=[$property,$unit,$source,$sheet];
+            }
+        }
+        if(count($jobs)!==391)throw new RuntimeException('عدد أوراق الوحدات لا يطابق أرشيف العميل.');
+        $totals=[];
+        foreach($jobs as [$property,$unit,$source,$sheet]){
+            $counts=DB::transaction(function()use($company,$property,$unit,$source,$sheet,$apply){
+                $people=[];
+                $existing=DB::table('asab_rental_history')->where('company_id',$company->id)->where('unit_id',$unit->id)
+                    ->where('source_file',$source)->where('source_sheet',$sheet['name'])->get()->keyBy('source_row');
+                foreach($sheet['candidates']??[] as $candidate){
+                    $n=(int)$candidate['source_row'];
+                    $name=trim((string)($candidate['name']??''));
+                    if($name==='')continue;
+                    $point=$existing->get($n);
+                    $cid=$point?->contact_id;
+                    if(!$cid && !$point){
+                        $phone=trim((string)($candidate['phone']??''))?:null;
+                        $found=Contact::where('company_id',$company->id)->where('name',$name)->where('phone',$phone)->limit(2)->get();
+                        $cid=$found->count()===1?$found->first()->id:null;
+                    }
+                    $people[$n]=['contact_id'=>$cid,'candidate'=>$candidate];
+                }
+                return $this->interpretSheet($company,$property,$unit,$source,$sheet,$people,$apply,$existing);
+            });
+            foreach($counts as $kind=>$number)$totals[$kind]=($totals[$kind]??0)+$number;
+        }
+        return $totals;
+    }
+
+    private function interpretSheet(Company $company,Property $property,Unit $unit,string $source,array $sheet,array $people,bool $apply,$known=null):array
+    {
+        $sheetName=(string)$sheet['name'];
+        $known??=DB::table('asab_rental_history')->where('company_id',$company->id)->where('unit_id',$unit->id)
+            ->where('source_file',$source)->where('source_sheet',$sheetName)->get()->keyBy('source_row');
+        $counter=array_fill_keys(['named','payment_candidate','recorded_amount','period','archive_only','inherited','created','updated','preserved'],0);
+        $buffer=[];
+        foreach(RentalSheetRows::explain($sheet,$people) as $n=>$entry){
+            $row=$entry['row'];$cells=$row['cells']??[];$kind=$entry['kind'];$anchor=$entry['anchor'];
+            $person=$anchor?$people[$anchor]:null;
+            $original=$known->get($n);
+            $counter[$kind]++;
+            if($anchor!==null && $anchor!==$n)$counter['inherited']++;
+            $fields=['entry_kind'=>$kind,'tenant_origin_row'=>$anchor];
+            if($kind!=='archive_only'){
+                $fields['contact_id']=$person['contact_id']??null;
+                $fields['tenant_label']=$person?mb_substr((string)$person['candidate']['name'],0,255):null;
+                $fields['record_type']=$kind==='named'?'tenant':'period';
+            }
+            if($original){
+                // Keep reviewed records and any personal link that was already persisted.
+                if($original->review_status!=='needs_review'){$counter['preserved']++;continue;}
+                if($original->contact_id && $original->tenant_origin_row===null){
+                    unset($fields['contact_id'],$fields['tenant_label']);
+                }
+                $changed=false;
+                foreach($fields as $column=>$value)if((string)($original->{$column}??'')!==(string)($value??'')){$changed=true;break;}
+                if($changed){
+                    $counter['updated']++;
+                    if($apply)DB::table('asab_rental_history')->where('company_id',$company->id)->where('id',$original->id)
+                        ->where('review_status','needs_review')->update($fields+['updated_at'=>now()]);
+                }
+                continue;
+            }
+            $counter['created']++;
+            if(!$apply)continue;
+            $rawFrom=trim((string)($cells['F']??''));$rawTo=trim((string)($cells['G']??''));
+            $buffer[]=$fields+[
+                'company_id'=>$company->id,'property_id'=>$property->id,'unit_id'=>$unit->id,
+                'source_key'=>$this->rowHash($source,$sheetName,$n,'rental'),
+                'source_file'=>$source,'source_sheet'=>mb_substr($sheetName,0,140),'source_row'=>$n,
+                'sequence_label'=>mb_substr(trim((string)($cells['A']??'')),0,40)?:null,
+                'reference'=>mb_substr(trim((string)($cells['E']??'')),0,120)?:null,
+                'date_from_source'=>mb_substr($rawFrom,0,100)?:null,'date_to_source'=>mb_substr($rawTo,0,100)?:null,
+                'starts_on'=>$this->explicitDate($rawFrom),'ends_on'=>$this->explicitDate($rawTo),
+                'source_amount'=>$this->money($cells['H']??null),'source_deposit'=>$this->money($cells['I']??null),
+                'review_status'=>'needs_review','memo'=>mb_substr(trim((string)($cells['L']??$cells['K']??'')),0,2000)?:null,
+                'encrypted_source'=>Crypt::encryptString(json_encode($cells,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)),
+                'created_at'=>now(),'updated_at'=>now(),
+            ];
+        }
+        foreach(array_chunk($buffer,50) as $chunk){
+            // Ensure consistent key order across archive-only and usable rows.
+            $chunk=array_map(fn($r)=>$r+['contact_id'=>null,'tenant_label'=>null,'record_type'=>'period'], $chunk);
+            DB::table('asab_rental_history')->insertOrIgnore($chunk);
+        }
+        return $counter;
+    }
+
+    private function importFinancialSheet(Company $company, string $source, array $sheet, bool $receiptsOnly=false): void
     {
         $bank = str_contains((string) $sheet['name'], 'بنكي');
         $channel = $bank ? 'bank' : 'cash';
@@ -305,10 +423,20 @@ final class AsabActualExcelImporter
                     $bank ? (string) ($c['E'] ?? '') : null,
                     $bank ? null : (string) ($c['C'] ?? ''),
                     (string) ($c['I'] ?? ''), $c);
+                if($propertyId || $unitId) {
+                    $sourceKey=$this->rowHash($source,(string)$sheet['name'],$sourceRow,'financial:'.$amountCol);
+                    $existing=DB::table('asab_financial_history')->where('company_id',$company->id)->where('source_key',$sourceKey)->where('review_status','unverified');
+                    if($propertyId)(clone $existing)->whereNull('property_id')->update(['property_id'=>$propertyId,'updated_at'=>now()]);
+                    if($unitId)(clone $existing)->where('property_id',$propertyId)->whereNull('unit_id')->update(['unit_id'=>$unitId,'updated_at'=>now()]);
+                }
                 $this->counter[$bank ? 'bank_receipts' : 'cash_receipts']++;
             }
             // Separate right-hand cash-withdrawals table in columns K/L/M.
             // It is not an invoice payment and is NOT posted to the live finance ledger.
+            if ($receiptsOnly) {
+                if (count($buffer)>=150) $this->insertBatch('asab_financial_history',$buffer,'finance_history');
+                continue;
+            }
             if (! $bank) {
                 $expenseDate = trim((string) ($c['K'] ?? ''));
                 $expense = $this->money($c['L'] ?? null);
@@ -415,10 +543,7 @@ final class AsabActualExcelImporter
 
     private function money(mixed $raw): ?string
     {
-        if ($raw === null || is_array($raw)) return null;
-        $value = str_replace([',', ' ', '٬'], '', trim((string) $raw));
-        if (! preg_match('/^\d{1,15}(?:\.\d{1,3})?$/', $value)) return null;
-        return number_format((float) $value, 3, '.', '');
+        return ExcelMoney::parse($raw);
     }
 
     private function rowHash(string $source, string $sheet, int $row, string $scope): string

@@ -17,3 +17,7 @@
 !/storage/framework/views/.gitignore
 /bootstrap/cache/*
 !/bootstrap/cache/.gitignore
+
+/storage/app/private/asab-gallery/
+/storage/app/asab-private-import/*
+!/storage/app/asab-private-import/.gitignore

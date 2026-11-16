@@ -2,11 +2,12 @@
 @section('title',($item?'تعديل ':'إضافة ').$def['singular'])
 @section('content')
 <div class="page-heading"><div><span class="eyebrow">{{ $def['title'] }}</span><h1>{{ $item?'تعديل':'إضافة' }} {{ $def['singular'] }}</h1><p>املأ الحقول بدقة. الحقول المشار إليها بنجمة مطلوبة.</p></div><a class="btn btn-outline" href="{{ route('modules.index',$module) }}">← العودة للقائمة</a></div>
-<form class="panel edit-panel" method="POST" action="{{ $item?route('modules.update',[$module,$item->id]):route('modules.store',$module) }}">@csrf @if($item)@method('PUT')@endif
+<form class="panel edit-panel" method="POST" enctype="multipart/form-data" action="{{ $item?route('modules.update',[$module,$item->id]):route('modules.store',$module) }}">@csrf @if($item)@method('PUT')@endif
 <div class="panel-head"><h3>البيانات الأساسية</h3><span class="tiny-label">{{ $def['singular'] }}</span></div>
 <div class="form-grid">
 @foreach($def['fields'] as $name=>$field)
-@php($val=old($name,$item?->{$name}??($prefill[$name]??null)))
+@continue($name==='identity_reference' && !in_array(\App\Support\Workspace::role(),['company_admin','manager'],true))
+@php($val=old($name,$module==='units' && $name==='status' && $item && $item->occupancy_status==='available' ? 'available' : ($item?->{$name}??($prefill[$name]??null))))
 <div class="form-field {{ $field['type']==='textarea'?'wide':'' }}"><label for="{{ $name }}">{{ $field['label'] }} @if($field['required']??false)<span class="required">*</span>@endif</label>
 @if($field['type']==='textarea')
 <textarea id="{{ $name }}" name="{{ $name }}" rows="4" {{ ($field['required']??false)?'required':'' }}>{{ $val }}</textarea>
@@ -24,5 +25,6 @@
 </div>
 @endforeach
 </div>
+@if(in_array($module,['properties','units'],true))@include('modules.gallery-form')@endif
 <div class="form-actions"><button class="btn btn-primary" type="submit">✓ حفظ البيانات</button><a href="{{ route('modules.index',$module) }}" class="btn btn-outline">إلغاء</a></div></form>
 @endsection

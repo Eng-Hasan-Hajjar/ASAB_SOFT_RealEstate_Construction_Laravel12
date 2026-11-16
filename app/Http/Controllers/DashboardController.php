@@ -8,8 +8,8 @@ class DashboardController extends CompanyBaseController {
   $metrics=[
    'properties'=>Property::where('company_id',$c)->count(),
    'units'=>Unit::where('company_id',$c)->count(),
-   'available'=>Unit::where('company_id',$c)->where('status','available')->count(),
-   'leases'=>Lease::where('company_id',$c)->where('status','active')->count(),
+   'available'=>Unit::where('company_id',$c)->occupancy('available')->count(),
+   'leases'=>Lease::where('company_id',$c)->current()->count(),
    'unpaid'=>Invoice::where('company_id',$c)->whereIn('status',['unpaid','partially_paid'])->sum('amount')-Payment::where('company_id',$c)->whereHas('invoice',fn($q)=>$q->whereIn('status',['unpaid','partially_paid']))->sum('amount'),
    'payments'=>Payment::where('company_id',$c)->whereMonth('paid_on',now()->month)->whereYear('paid_on',now()->year)->sum('amount'),
    'tickets'=>MaintenanceTicket::where('company_id',$c)->whereNotIn('status',['resolved','closed'])->count(),

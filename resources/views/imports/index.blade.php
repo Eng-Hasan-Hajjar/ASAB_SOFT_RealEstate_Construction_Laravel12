@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title','مراجعة ملفات Excel')
+@section('title','استيراد البيانات')
 @section('content')
 <div class="page-heading"><div><span class="eyebrow">LEGACY DATA TRANSITION</span><h1>استيراد البيانات للمراجعة</h1><p>مساحة داخلية مؤمنة لمعاينة ملفات العقارات والتحصيل النقدي والبنكي قبل تحويلها إلى سجلات تشغيلية.</p></div><span class="local-pill">لا اعتماد تلقائياً</span></div>
 <div class="content-grid"><section class="panel"><h3>رفع ملف Excel أو CSV</h3><form action="{{ route('imports.upload') }}" method="POST" enctype="multipart/form-data" class="form-stack">@csrf

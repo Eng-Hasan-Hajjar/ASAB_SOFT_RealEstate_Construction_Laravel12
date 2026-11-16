@@ -20,12 +20,20 @@ Route::middleware(['auth','active'])->group(function(){
   Route::post('/leave',[PlatformController::class,'leave'])->name('leave');
  });
  Route::middleware('role:company_admin,manager,agent,accountant,viewer')->group(function(){
+  Route::get('/property-explorer',[\App\Http\Controllers\PropertyExplorerController::class,'index'])->name('explorer.index');
+  Route::get('/property-explorer/{property}',[\App\Http\Controllers\PropertyExplorerController::class,'show'])->whereNumber('property')->name('explorer.show');
+  Route::get('/workspace-gallery/{image}',[\App\Http\Controllers\PropertyExplorerController::class,'image'])->whereNumber('image')->name('explorer.image');
   Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard');
   Route::get('/asab/history/rentals',[AsabImportedHistoryController::class,'rentals'])->name('asab.history.rentals');
   Route::middleware('role:company_admin,manager,accountant')->get('/asab/history/finance',[AsabImportedHistoryController::class,'finance'])->name('asab.history.finance');
+  Route::middleware('role:company_admin,manager,accountant')->group(function(){
+   Route::get('/asab/receipts/{receipt}',[\App\Http\Controllers\AsabReceiptReviewController::class,'show'])->whereNumber('receipt')->name('asab.receipts.show');
+   Route::post('/asab/receipts/{receipt}',[\App\Http\Controllers\AsabReceiptReviewController::class,'post'])->whereNumber('receipt')->name('asab.receipts.post');
+  });
   Route::get('/assistant',[AssistantController::class,'index'])->name('assistant.index');Route::post('/assistant/ask',[AssistantController::class,'ask'])->middleware('throttle:30,1')->name('assistant.ask');
   Route::get('/leases',[LeaseController::class,'index'])->name('leases.index');Route::get('/leases/create',[LeaseController::class,'create'])->name('leases.create');Route::post('/leases',[LeaseController::class,'store'])->name('leases.store');
   Route::get('/leases/{lease}',[LeaseController::class,'show'])->name('leases.show');Route::patch('/leases/{lease}/close',[LeaseController::class,'close'])->name('leases.close');
+  Route::patch('/leases/{lease}/activate',[LeaseController::class,'activate'])->whereNumber('lease')->name('leases.activate');
   Route::get('/finance',[FinanceController::class,'index'])->name('finance.index');
   Route::post('/finance/accounts',[FinanceController::class,'account'])->name('finance.accounts.store');
   Route::post('/finance/entries',[FinanceController::class,'entry'])->name('finance.entries.store');
@@ -59,6 +67,7 @@ Route::middleware(['auth','active'])->group(function(){
   Route::get('/manage/{module}',[ModuleController::class,'index'])->name('modules.index');
   Route::get('/manage/{module}/create',[ModuleController::class,'create'])->name('modules.create');
   Route::post('/manage/{module}',[ModuleController::class,'store'])->name('modules.store');
+  Route::get('/manage/{module}/{id}/preview',[ModuleController::class,'preview'])->whereNumber('id')->name('modules.preview');
   Route::get('/manage/{module}/{id}',[ModuleController::class,'show'])->whereNumber('id')->name('modules.show');
   Route::get('/manage/{module}/{id}/edit',[ModuleController::class,'edit'])->whereNumber('id')->name('modules.edit');
   Route::put('/manage/{module}/{id}',[ModuleController::class,'update'])->whereNumber('id')->name('modules.update');

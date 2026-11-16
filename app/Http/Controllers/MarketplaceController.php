@@ -12,16 +12,16 @@ class MarketplaceController extends CompanyBaseController {
  private function writable():void {abort_unless(in_array($this->role(),['company_admin','manager','agent'],true),403);}
  public function index(){
   $c=$this->companyId();$properties=Property::where('company_id',$c)->with(['cover'])
-   ->withCount(['units','units as live_units_count'=>fn($q)=>$q->where('status','available')->where('is_listed',true)])
+   ->withCount(['units','units as live_units_count'=>fn($q)=>$q->occupancy('available')->where('is_listed',true)])
    ->latest('id')->paginate(12);
   $stats=['properties'=>Property::where('company_id',$c)->count(),
    'published'=>Property::where('company_id',$c)->where('is_published',true)->count(),
-   'listed_units'=>Unit::where('company_id',$c)->where('is_listed',true)->where('status','available')->count(),
+   'listed_units'=>Unit::where('company_id',$c)->where('is_listed',true)->occupancy('available')->count(),
    'new_inquiries'=>PropertyInquiry::where('company_id',$c)->where('status','new')->count()];
   return view('marketplace.index',compact('properties','stats'));
  }
  public function edit(int $property){
-  $record=$this->property($property)->load(['media','units']);
+  $record=$this->property($property)->load(['media','units'=>fn($q)=>$q->withOccupancy()]);
   return view('marketplace.edit',compact('record'));
  }
  public function save(Request $request,int $property){
@@ -35,7 +35,7 @@ class MarketplaceController extends CompanyBaseController {
  public function toggle(Request $request,int $property){
   $this->writable();$record=$this->property($property);
   if(!$record->is_published && $record->status!=='active')throw ValidationException::withMessages(['publish'=>'لا يمكن نشر عقار غير نشط. حدّث حالة العقار أولاً.']);
-  if(!$record->is_published && !$record->units()->where('status','available')->where('is_listed',true)->exists())
+  if(!$record->is_published && !$record->units()->occupancy('available')->where('is_listed',true)->exists())
     throw ValidationException::withMessages(['publish'=>'قبل النشر، أضف وحدة متاحة وحدّد إظهارها في السوق.']);
   $record->update(['is_published'=>!$record->is_published,'published_at'=>!$record->is_published?now():null]);
   Audit::record('updated','property_listing',$record->id,$record->is_published?'نشر إعلان عقار':'إخفاء إعلان عقار');
@@ -53,10 +53,10 @@ class MarketplaceController extends CompanyBaseController {
     'sale_price'=>['nullable','numeric','min:0','max:1000000000','decimal:0,3'],
     'furnished'=>['sometimes','boolean'],'is_listed'=>['sometimes','boolean']]);
   if(in_array($data['listing_type'],['sale','both'],true)&&empty($data['sale_price']))throw ValidationException::withMessages(['sale_price'=>'أدخل سعر البيع عندما يتضمن الإعلان البيع.']);
-  if($request->boolean('is_listed')&&$item->status!=='available')throw ValidationException::withMessages(['is_listed'=>'الوحدات المؤجرة أو غير المتاحة لا يمكن عرضها في السوق.']);
+  if($request->boolean('is_listed')&&$item->occupancy_status!=='available')throw ValidationException::withMessages(['is_listed'=>'الوحدات المؤجرة أو غير المتاحة لا يمكن عرضها في السوق.']);
   $item->update(['listing_type'=>$data['listing_type'],'sale_price'=>$data['sale_price']??null,
    'furnished'=>$request->boolean('furnished'),'is_listed'=>$request->boolean('is_listed')]);
-  if($record->is_published && !$record->units()->where('status','available')->where('is_listed',true)->exists()){
+  if($record->is_published && !$record->units()->occupancy('available')->where('is_listed',true)->exists()){
    $record->update(['is_published'=>false,'published_at'=>null]);
   }
   Audit::record('updated','unit_listing',$item->id,'تعديل بيانات عرض الوحدة');return back()->with('success','تم تحديث عرض الوحدة.');

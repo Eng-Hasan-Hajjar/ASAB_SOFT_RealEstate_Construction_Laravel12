@@ -20,7 +20,7 @@ class ReportsController extends CompanyBaseController {
   $outstanding=Invoice::where('company_id',$c)->whereNotIn('status',['paid','void'])->sum('amount')-Payment::where('company_id',$c)->whereHas('invoice',fn($q)=>$q->whereNotIn('status',['paid','void']))->sum('amount');
   $overdue=Invoice::where('company_id',$c)->whereDate('due_on','<',today())->whereNotIn('status',['paid','void'])->count();
   $unlinkedPayments=Payment::where('company_id',$c)->whereDoesntHave('ledgerEntry')->count();
-  $unitsTotal=Unit::where('company_id',$c)->count();$unitsOccupied=Unit::where('company_id',$c)->where('status','occupied')->count();
+  $unitsTotal=Unit::where('company_id',$c)->count();$unitsOccupied=Unit::where('company_id',$c)->occupancy('occupied')->count();
   $tickets=MaintenanceTicket::where('company_id',$c)->whereNotIn('status',['closed','resolved'])->count();
   $projectsSpent=ProjectExpense::where('company_id',$c)->whereBetween('spent_on',[$from,$to])->sum('amount');
   return view('reports.index',compact('income','expense','rent','receiptsByMethod','propertyRows','daily','month','from','to','outstanding','overdue','unlinkedPayments','unitsTotal','unitsOccupied','tickets','projectsSpent'));

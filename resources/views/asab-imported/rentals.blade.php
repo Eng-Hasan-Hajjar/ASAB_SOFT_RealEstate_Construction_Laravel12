@@ -6,10 +6,10 @@
 </style>
 <div class="asab-history">
  <div class="ah-head">
-  <div><span class="ah-eyebrow">ASAB SOFT / PROPERTY HISTORY</span><h1>السجل التاريخي للإيجارات</h1><p>فترات الإيجار والمستأجرون والمبالغ كما وردت في سجلات Excel، ضمن مساحة شركتك فقط.</p></div>
+  <div><span class="ah-eyebrow">ASAB SOFT / PROPERTY HISTORY</span><h1>السجل التاريخي للإيجارات</h1><p>فترات الإيجار والمبالغ والسندات السابقة، مرتبة حسب العقار والوحدة والمستأجر.</p></div>
   <div class="ah-summary"><div class="ah-mini"><strong>{{ number_format($total) }}</strong><small>سجل تاريخي مطابق للتصفية</small></div><a class="ah-link" href="{{ route('modules.index','properties') }}">عرض العقارات ←</a></div>
  </div>
- <div class="ah-warning">هذه سجلات مصدرية وليست عقوداً نشطة مؤكدة. التواريخ الهجرية تبقى بصيغتها الأصلية، والمبالغ لا تُنشئ استحقاقات أو فواتير إلا بعد مراجعتها واعتمادها.</div>
+ <div class="ah-warning">يعرض السجل الفترات والمبالغ التاريخية. ظهور سند أو مبلغ هنا لا يعني ترحيله إلى الحسابات أو اعتماد الإشغال الحالي.</div>
  <div class="ah-panel">
   <form method="GET" action="{{ route('asab.history.rentals') }}" class="ah-filters">
    <div><label for="ah_property">العقار</label><select id="ah_property" name="property"><option value="">جميع العقارات</option>
@@ -18,16 +18,21 @@
    @endforeach
    </select></div>
    <div><label for="ah_q">الاسم أو رمز الوحدة أو السند</label><input id="ah_q" name="q" maxlength="100" value="{{ request('q') }}" placeholder="بحث في السجلات..."></div>
+   <div><label for="rent_min">قيمة من</label><input id="rent_min" type="number" name="min_amount" min="0" step="0.001" value="{{ request('min_amount') }}"></div>
+   <div><label for="rent_max">قيمة إلى</label><input id="rent_max" type="number" name="max_amount" min="0" step="0.001" value="{{ request('max_amount') }}"></div>
+   <div><label for="rent_kind">نوع السجل</label><select id="rent_kind" name="kind"><option value="">الكل</option>
+   @foreach($kinds as $key=>$label)<option value="{{ $key }}" @selected(request('kind')===$key)>{{ $label }}</option>@endforeach
+   </select></div>
    <button class="ah-btn" type="submit">بحث وتصفية</button><a class="ah-link" href="{{ route('asab.history.rentals') }}">إعادة ضبط</a>
   </form>
-  <div class="ah-table-wrap"><table><thead><tr><th>العقار / الوحدة</th><th>المستأجر من المصدر</th><th>الفترة الأصلية</th><th>القيمة الأصلية (ر.س)</th><th>السند</th><th>المرجع</th><th>الحالة</th></tr></thead><tbody>
+  <div class="ah-table-wrap"><table><thead><tr><th>العقار / الوحدة</th><th>المستأجر</th><th>الفترة الأصلية</th><th>المبلغ المسجل</th><th>السند</th><th>رقم السجل</th><th>الحالة</th></tr></thead><tbody>
   @forelse($items as $record)
-   <tr><td><b>{{ $record->property?->name }}</b><div><small>{{ $record->unit?->code }}</small></div></td><td>{{ $record->contact?->name ?: ($record->tenant_label ?: 'سطر فترة بلا اسم') }}</td>
+   <tr><td><b>{{ $record->property?->name }}</b><div><small>{{ $record->unit?->code }}</small></div></td><td>{{ $record->contact?->name ?: ($record->tenant_label ?: 'الاسم غير محدد') }} @if($record->tenant_origin_row && (int)$record->tenant_origin_row!==(int)$record->source_row)<small class="ops-history-note">تابع لسجل المستأجر السابق في نفس الوحدة</small>@endif</td>
    <td><div dir="ltr">{{ $record->date_from_source ?: '—' }}</div><div dir="ltr">{{ $record->date_to_source ?: '—' }}</div></td>
-   <td class="ah-amount">{{ $record->source_amount !== null ? number_format((float)$record->source_amount,2) : '—' }}</td>
-   <td>{{ $record->reference ?: '—' }}</td><td><small>{{ $record->source_file }} / {{ $record->source_sheet }} / صف {{ $record->source_row }}</small></td><td><span class="ah-tag">بحاجة لتدقيق</span></td></tr>
+   <td class="ah-amount">{{ $record->source_amount !== null ? \App\Support\Workspace::company()->money($record->source_amount) : '—' }}</td>
+   <td>{{ $record->reference ?: '—' }}</td><td><small>#{{ $record->id }}</small></td><td><span class="ops-kind {{ $record->entry_kind==='payment_candidate'?'ops-kind-review':'' }}">{{ $kinds[$record->entry_kind] ?? 'سجل سابق' }}</span></td></tr>
   @empty
-   <tr><td colspan="7" class="ah-empty">لا توجد سجلات تاريخية مستوردة بهذه التصفية. نفّذ أمر الاستيراد الفعلي أولاً.</td></tr>
+   <tr><td colspan="7" class="ah-empty">لا توجد سجلات تاريخية مطابقة لهذه التصفية.</td></tr>
   @endforelse
   </tbody></table></div><div class="ah-footer">{{ $items->links() }}</div>
  </div>

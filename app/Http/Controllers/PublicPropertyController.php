@@ -8,11 +8,11 @@ use Illuminate\Validation\Rule;
 class PublicPropertyController extends Controller {
  private function visible(){return Property::query()->where('is_published',true)->where('status','active')
   ->whereHas('company',fn($q)=>$q->where('is_active',true))
-  ->whereHas('units',fn($q)=>$q->where('is_listed',true)->where('status','available'));}
+  ->whereHas('units',fn($q)=>$q->where('is_listed',true)->occupancy('available'));}
  private function cardData($q){return $q->with(['cover','company:id,name,currency,country_code'])
-  ->withCount(['units as live_units_count'=>fn($q)=>$q->where('is_listed',true)->where('status','available')])
-  ->withMin(['units as lowest_rent'=>fn($q)=>$q->where('is_listed',true)->where('status','available')->whereIn('listing_type',['rent','both'])],'monthly_rent')
-  ->withMin(['units as lowest_sale'=>fn($q)=>$q->where('is_listed',true)->where('status','available')->whereIn('listing_type',['sale','both'])->whereNotNull('sale_price')],'sale_price');}
+  ->withCount(['units as live_units_count'=>fn($q)=>$q->where('is_listed',true)->occupancy('available')])
+  ->withMin(['units as lowest_rent'=>fn($q)=>$q->where('is_listed',true)->occupancy('available')->whereIn('listing_type',['rent','both'])],'monthly_rent')
+  ->withMin(['units as lowest_sale'=>fn($q)=>$q->where('is_listed',true)->occupancy('available')->whereIn('listing_type',['sale','both'])->whereNotNull('sale_price')],'sale_price');}
  public function home(){
   $latest=$this->cardData($this->visible()->orderByDesc('is_featured')->latest('published_at'))->limit(6)->get();
   $metrics=['listings'=>$this->visible()->count(),'cities'=>$this->visible()->distinct('city')->count('city')];
@@ -31,7 +31,7 @@ class PublicPropertyController extends Controller {
   if(!empty($filters['country']))$q->where('country_code',$filters['country']);
   if(!empty($filters['city']))$q->where('city','like','%'.$filters['city'].'%');
   $q->whereHas('units',function($u)use($filters){
-    $u->where('is_listed',true)->where('status','available');
+    $u->where('is_listed',true)->occupancy('available');
     if(!empty($filters['type']))$u->where('type',$filters['type']);
     if(!empty($filters['rooms']))$u->where('rooms','>=',$filters['rooms']);
     if(!empty($filters['intent'])){
@@ -54,7 +54,7 @@ class PublicPropertyController extends Controller {
  }
  public function show(Property $property){
   abort_unless($property->is_published&&$property->status==='active'&&$property->company?->is_active,404);
-  $units=$property->units()->where('is_listed',true)->where('status','available')->orderBy('monthly_rent')->get();
+  $units=$property->units()->where('is_listed',true)->occupancy('available')->orderBy('monthly_rent')->get();
   abort_if($units->isEmpty(),404);
   $property->load(['media','company']);
   return view('public.property',compact('property','units'));
@@ -64,7 +64,7 @@ class PublicPropertyController extends Controller {
   $data=$request->validate([
    'name'=>['required','string','min:2','max:160'],'phone'=>['required','string','min:8','max:40'],
    'email'=>['nullable','email','max:255'],'message'=>['nullable','string','max:2000'],
-   'unit_id'=>['nullable','integer',Rule::exists('units','id')->where(fn($q)=>$q->where('property_id',$property->id)->where('company_id',$property->company_id)->where('is_listed',true)->where('status','available'))],
+   'unit_id'=>['nullable','integer',function($field,$id,$fail) use ($property) { if(! $property->units()->where('company_id',$property->company_id)->whereKey($id)->where('is_listed',true)->occupancy('available')->exists()) $fail('الوحدة غير متاحة لهذا الإعلان.'); }],
    'privacy_accepted'=>['accepted'],'website'=>['nullable','max:0'],
   ]);
   DB::transaction(function()use($property,$data){

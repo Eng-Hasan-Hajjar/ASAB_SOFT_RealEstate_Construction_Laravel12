@@ -4,9 +4,9 @@
 
 @section('content')
 <div class="dashboard-quick-links" style="margin-bottom:16px">
-  <a class="quick-feature" href="{{ route('asab.history.rentals') }}">▤ <span><b>سجلات المستأجرين من Excel</b><small>تاريخ الوحدات والعقود والمبالغ</small></span> ←</a>
+  <a class="quick-feature" href="{{ route('asab.history.rentals') }}">▤ <span><b>سجل الإيجارات التاريخي</b><small>تاريخ الوحدات والعقود والمبالغ</small></span> ←</a>
   @if(in_array(\App\Support\Workspace::role(), ['company_admin','manager','accountant'], true))
-  <a class="quick-feature" href="{{ route('asab.history.finance') }}">◉ <span><b>الدفتر المالي المستورد</b><small>نقدي وبنكي — بيانات تاريخية للمراجعة</small></span> ←</a>
+  <a class="quick-feature" href="{{ route('asab.history.finance') }}">◉ <span><b>مراجعة التحصيلات السابقة</b><small>نقدي وبنكي — حركات سابقة للمراجعة</small></span> ←</a>
   @endif
 </div>
 
@@ -35,9 +35,11 @@
         <a class="quick-feature" href="{{ route('reservations.index') }}">
             ◷ <span><b>الحجوزات</b><small>متابعة إشغال الوحدات</small></span> ←
         </a>
+        @if(in_array(\App\Support\Workspace::role(),['company_admin','manager','accountant'],true))
         <a class="quick-feature" href="{{ route('imports.index') }}">
-            ⇧ <span><b>استيراد Excel</b><small>منطقة مراجعة آمنة</small></span> ←
+            ⇧ <span><b>استيراد البيانات</b><small>منطقة مراجعة آمنة</small></span> ←
         </a>
+        @endif
     </div>
 
     <div class="page-heading dashboard-heading">
