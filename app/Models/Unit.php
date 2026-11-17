@@ -55,4 +55,14 @@ class Unit extends Model
     {
         return ['available'=>'متاحة','occupied'=>'مؤجرة','reserved'=>'محجوزة','maintenance'=>'صيانة','inactive'=>'غير نشطة'];
     }
+
+    public static function rentPeriodLabels(): array
+    {
+        return ['daily'=>'يوميًا','monthly'=>'شهريًا','yearly'=>'سنويًا'];
+    }
+
+    public function getRentPeriodLabelAttribute(): string
+    {
+        return self::rentPeriodLabels()[$this->rent_period] ?? self::rentPeriodLabels()['monthly'];
+    }
 }

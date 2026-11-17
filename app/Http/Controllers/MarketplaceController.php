@@ -2,16 +2,26 @@
 namespace App\Http\Controllers;
 use App\Models\{Property,PropertyInquiry,PropertyMedia,Unit};
 use App\Services\Audit;
+use App\Support\PropertyAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 class MarketplaceController extends CompanyBaseController {
- private function property(int $id):Property{return Property::where('company_id',$this->companyId())->findOrFail($id);}
+ // Scoped the same way as every other property lookup in the app: an out-of-scope id simply
+ // isn't found, so every action below (edit/save/toggle/feature/unit/upload/cover/deleteImage)
+ // is automatically closed to a property-scoped employee for a property outside their grants.
+ private function property(int $id):Property{
+  $q=Property::where('company_id',$this->companyId());
+  PropertyAccess::scopeProperties($q,auth()->user());
+  return $q->findOrFail($id);
+ }
  private function writable():void {abort_unless(in_array($this->role(),['company_admin','manager','agent'],true),403);}
  public function index(){
-  $c=$this->companyId();$properties=Property::where('company_id',$c)->with(['cover'])
+  $c=$this->companyId();$propertyQuery=Property::where('company_id',$c);
+  PropertyAccess::scopeProperties($propertyQuery,auth()->user());
+  $properties=$propertyQuery->with(['cover'])
    ->withCount(['units','units as live_units_count'=>fn($q)=>$q->occupancy('available')->where('is_listed',true)])
    ->latest('id')->paginate(12);
   $stats=['properties'=>Property::where('company_id',$c)->count(),
@@ -22,7 +32,11 @@ class MarketplaceController extends CompanyBaseController {
  }
  public function edit(int $property){
   $record=$this->property($property)->load(['media','units'=>fn($q)=>$q->withOccupancy()]);
-  return view('marketplace.edit',compact('record'));
+  $user=auth()->user();
+  $canViewRent=PropertyAccess::canViewPrice($user,$record->id,'rent');
+  $canViewSale=PropertyAccess::canViewPrice($user,$record->id,'sale');
+  $canEditPrices=PropertyAccess::canEditPrices($user,$record->id);
+  return view('marketplace.edit',compact('record','canViewRent','canViewSale','canEditPrices'));
  }
  public function save(Request $request,int $property){
   $this->writable();$record=$this->property($property);
@@ -52,10 +66,16 @@ class MarketplaceController extends CompanyBaseController {
   $data=$request->validate(['listing_type'=>['required',Rule::in(['rent','sale','both'])],
     'sale_price'=>['nullable','numeric','min:0','max:1000000000','decimal:0,3'],
     'furnished'=>['sometimes','boolean'],'is_listed'=>['sometimes','boolean']]);
-  if(in_array($data['listing_type'],['sale','both'],true)&&empty($data['sale_price']))throw ValidationException::withMessages(['sale_price'=>'أدخل سعر البيع عندما يتضمن الإعلان البيع.']);
+  // The submitted sale_price is only ever trusted when this user may edit prices for this
+  // property; otherwise it's discarded here — server-side, regardless of what was posted — and
+  // the existing stored price (which this user may or may not even be allowed to see) is what
+  // the "sale requires a price" business rule below is checked against.
+  $canEditPrices=PropertyAccess::canEditPrices(auth()->user(),$record->id);
+  $effectiveSalePrice=$canEditPrices?($data['sale_price']??null):$item->sale_price;
+  if(in_array($data['listing_type'],['sale','both'],true)&&empty($effectiveSalePrice))throw ValidationException::withMessages(['sale_price'=>'أدخل سعر البيع عندما يتضمن الإعلان البيع.']);
   if($request->boolean('is_listed')&&$item->occupancy_status!=='available')throw ValidationException::withMessages(['is_listed'=>'الوحدات المؤجرة أو غير المتاحة لا يمكن عرضها في السوق.']);
-  $item->update(['listing_type'=>$data['listing_type'],'sale_price'=>$data['sale_price']??null,
-   'furnished'=>$request->boolean('furnished'),'is_listed'=>$request->boolean('is_listed')]);
+  $item->update(['listing_type'=>$data['listing_type']]+($canEditPrices?['sale_price'=>$data['sale_price']??null]:[])+
+   ['furnished'=>$request->boolean('furnished'),'is_listed'=>$request->boolean('is_listed')]);
   if($record->is_published && !$record->units()->occupancy('available')->where('is_listed',true)->exists()){
    $record->update(['is_published'=>false,'published_at'=>null]);
   }

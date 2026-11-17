@@ -19,7 +19,7 @@
 @endforeach
 </select>
 @else
-<input id="{{ $name }}" name="{{ $name }}" type="{{ match($field['type']){'date'=>'date','money','number','progress'=>'number','email'=>'email',default=>'text'} }}" value="{{ $val }}" @if(in_array($field['type'],['money','number','progress'],true)) step="{{ $field['type']==='money'?'0.001':($field['type']==='progress'?'1':'any') }}" @endif @if($field['type']==='progress') min="0" max="100" @endif {{ ($field['required']??false)?'required':'' }}>
+<input id="{{ $name }}" name="{{ $name }}" type="{{ match($field['type']){'date'=>'date','money','number','progress'=>'number','email'=>'email',default=>'text'} }}" value="{{ $val }}" @if(in_array($field['type'],['money','number','progress'],true)) step="{{ $field['type']==='money'?'0.001':($field['type']==='progress'?'1':'any') }}" @endif @if($field['type']==='progress') min="0" max="100" @endif {{ ($field['required']??false)?'required':'' }} {{ ($module==='units' && $name==='monthly_rent' && ($priceLocked??false))?'readonly title="لا تملك صلاحية تعديل السعر لهذا العقار"':'' }}>
 @endif
 @error($name)<small class="field-error">{{ $message }}</small>@enderror
 </div>

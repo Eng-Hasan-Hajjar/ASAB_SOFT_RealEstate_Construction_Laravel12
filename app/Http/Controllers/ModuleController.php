@@ -1,6 +1,6 @@
 <?php
 namespace App\Http\Controllers;
-use App\Support\{ModuleRegistry,AssetFilters};
+use App\Support\{ModuleRegistry,AssetFilters,PropertyAccess};
 use App\Services\WorkspaceGallery;
 use App\Models\{Contact,Property,Unit};
 use App\Services\Audit;
@@ -18,13 +18,24 @@ class ModuleController extends CompanyBaseController {
   return $def;
  }
  private function writable(string $module):void {abort_unless(ModuleRegistry::canWrite($this->role(),$module),403,'دورك يسمح بالقراءة فقط في هذا القسم.');}
- private function query(array $def) {return $def['model']::query()->where('company_id',$this->companyId());}
+ // Every list/find of properties or units goes through here, so a property-scoped employee
+ // (see App\Support\PropertyAccess) gets a 404 — not a 403 — for anything outside their grants:
+ // the record simply isn't in the query result, exactly like another company's data.
+ private function query(array $def) {
+  $q=$def['model']::query()->where('company_id',$this->companyId());
+  $user=auth()->user();
+  if ($def['model']===Property::class) PropertyAccess::scopeProperties($q,$user);
+  elseif ($def['model']===Unit::class) PropertyAccess::scopeByPropertyId($q,$user);
+  return $q;
+ }
  private function optionsFor(string $source):array {
   $c=$this->companyId();
   if ($source==='users') return User::where('company_id',$c)->where('is_active',true)->orderBy('name')->pluck('name','id')->all();
   $def=ModuleRegistry::get($source);
+  $q=$def['model']::where('company_id',$c);
+  if ($source==='properties') PropertyAccess::scopeProperties($q,auth()->user());
   $column=match($source){'units'=>'code','projects'=>'name',default=>'name'};
-  return $def['model']::where('company_id',$c)->orderBy($column)->pluck($column,'id')->all();
+  return $q->orderBy($column)->pluck($column,'id')->all();
  }
  private function options(array $def):array {
   $options=[];
@@ -78,6 +89,14 @@ class ModuleController extends CompanyBaseController {
   if(!array_key_exists((string)$dateField,$dateFields))$dateField=null;
   $moneyField=$data['money_field']??array_key_first($moneyFields);
   if(!array_key_exists((string)$moneyField,$moneyFields))$moneyField=null;
+  // A property-scoped employee's price visibility varies per property, so a min/max range
+  // filter on the rent column would let them infer a hidden price by narrowing results
+  // ("is it between 4000 and 4500?") even though the value itself is never displayed. Block
+  // that inference channel for restricted users — both the generic money filter above and the
+  // advanced rent range/sort below.
+  $priceScoped=$module==='units' && PropertyAccess::restricted(auth()->user());
+  if($priceScoped && $moneyField==='monthly_rent')$moneyField=null;
+  if($priceScoped){unset($data['asset_rent_min'],$data['asset_rent_max']);if(in_array($data['asset_sort']??null,['rent_low','rent_high'],true))unset($data['asset_sort']);}
   if($dateField){
    if(!empty($data['date_from']))$q->whereDate($dateField,'>=',$data['date_from']);
    if(!empty($data['date_to']))$q->whereDate($dateField,'<=',$data['date_to']);
@@ -153,7 +172,17 @@ class ModuleController extends CompanyBaseController {
     ->orderByRaw("CASE WHEN status='active' AND starts_on <= ? AND ends_on >= ? THEN 0 ELSE 1 END",[today()->toDateString(),today()->toDateString()])
     ->orderByDesc('starts_on')->limit(12)->get();
   }
+  $user=auth()->user();
   foreach($def['fields'] as $fieldName=>$field){
+   // Rent price is governed by the per-property grant, not by the generic field rendering
+   // below: show it only when the viewer is explicitly allowed to see this property's rent.
+   if($module==='units' && $fieldName==='monthly_rent'){
+    if(!PropertyAccess::canViewPrice($user,$item->property_id,'rent')){
+     $values[]=['label'=>$field['label'],'value'=>'🔒 غير مصرح بعرض السعر'];continue;
+    }
+    $values[]=['label'=>$field['label'],'value'=>\App\Support\Workspace::company()->money($item->monthly_rent).' / '.$item->rent_period_label];
+    continue;
+   }
    $raw=$fieldName==='identity_reference' && !in_array($this->role(),['company_admin','manager'],true) ? 'محجوب وفق صلاحيات الوصول' : ($module==='units' && $fieldName==='status' ? Unit::statusLabels()[$item->occupancy_status] : $item->{$fieldName});
    if($field['type']==='relation' && $raw!==null){
     $source=$field['source'];
@@ -178,6 +207,9 @@ class ModuleController extends CompanyBaseController {
   };
   foreach($extraFields as $key=>$label){
    if(!array_key_exists($key,$item->getAttributes()))continue;
+   if($module==='units' && $key==='sale_price' && !PropertyAccess::canViewPrice($user,$item->property_id,'sale')){
+    $values[]=['label'=>$label,'value'=>'🔒 غير مصرح بعرض السعر'];continue;
+   }
    $value=$item->{$key};
    if(is_bool($value))$value=$value?'نعم':'لا';
    elseif($value instanceof \DateTimeInterface)$value=$value->format('Y-m-d H:i');
@@ -186,16 +218,23 @@ class ModuleController extends CompanyBaseController {
   return view(request()->ajax()?'modules.preview':'modules.detail-page',compact('def','item','module','values','spaces','images','leases','assetUnits','historical'));
  }
  public function create(Request $request,string $module){
-  $this->writable($module);$def=$this->definition($module);$options=$this->options($def);$item=null;$prefill=[];
+  $this->writable($module);
+  // A property-scoped employee only ever gets access to properties an admin explicitly grants;
+  // letting them create brand-new properties would hand them ungoverned, auto-owned records, so
+  // that stays admin/manager-only for anyone under the new restriction.
+  if($module==='properties' && PropertyAccess::restricted(auth()->user()))abort(403,'لا تملك صلاحية إضافة عقارات جديدة. تواصل مع مدير الشركة.');
+  $def=$this->definition($module);$options=$this->options($def);$item=null;$prefill=[];
   if($module==='units' && $request->query('property_id') && \App\Models\Property::where('company_id',$this->companyId())->whereKey($request->query('property_id'))->exists())$prefill['property_id']=(int)$request->query('property_id');
-  return view('modules.form',compact('module','def','options','item','prefill'));
+  $priceLocked=$module==='units' && !PropertyAccess::canEditPrices(auth()->user(),$prefill['property_id']??null);
+  return view('modules.form',compact('module','def','options','item','prefill','priceLocked'));
  }
  public function edit(string $module,int $id){
   $this->writable($module);$def=$this->definition($module);$item=$this->query($def)->findOrFail($id);$options=$this->options($def);
   $gallery=app(WorkspaceGallery::class);
   $spaces=($item instanceof Property || $item instanceof Unit)?$gallery->spaces($item):collect();
   $images=($item instanceof Property || $item instanceof Unit)?$gallery->images($item):collect();
-  return view('modules.form',compact('module','def','options','item','spaces','images'));
+  $priceLocked=$module==='units' && !PropertyAccess::canEditPrices(auth()->user(),$item->property_id);
+  return view('modules.form',compact('module','def','options','item','spaces','images','priceLocked'));
  }
  private function rules(array $def):array {
   $rules=[];$company=$this->companyId();
@@ -232,6 +271,20 @@ class ModuleController extends CompanyBaseController {
  private function validateData(Request $request,array $def,string $module,?int $id):array {
   $data=$request->validate($this->rules($def));$company=$this->companyId();
   if($module==='units') {
+   $user=auth()->user();
+   // Defence in depth: findOrFail() in query() already 404s an out-of-scope unit before we get
+   // here, but a *create* has no existing record to gate on, so re-check the submitted
+   // property_id directly — this is what actually stops "open/assign a unit under a property
+   // outside my scope by crafting the request" rather than relying on the UI not offering it.
+   if(!empty($data['property_id']) && PropertyAccess::restricted($user) && !in_array((int)$data['property_id'],PropertyAccess::grantedPropertyIds($user),true)){
+    throw ValidationException::withMessages(['property_id'=>'لا تملك صلاحية الوصول لهذا العقار.']);
+   }
+   // Price fields are never trusted from the request when the user lacks edit-price permission
+   // for the chosen property — silently dropped here so any other, legitimate field changes in
+   // the same submission still go through, but a tampered price never reaches the database.
+   if(!empty($data['property_id']) && !PropertyAccess::canEditPrices($user,(int)$data['property_id'])){
+    unset($data['monthly_rent']);
+   }
    if(!empty($data['property_id'])&&isset($data['code'])){
     $q=\App\Models\Unit::where('company_id',$company)->where('property_id',$data['property_id'])->where('code',$data['code']);
     if($id)$q->whereKeyNot($id);
@@ -255,7 +308,9 @@ class ModuleController extends CompanyBaseController {
   return $data;
  }
  public function store(Request $request,string $module){
-  $this->writable($module);$def=$this->definition($module);$data=$this->validateData($request,$def,$module,null);
+  $this->writable($module);
+  if($module==='properties' && PropertyAccess::restricted(auth()->user()))abort(403,'لا تملك صلاحية إضافة عقارات جديدة. تواصل مع مدير الشركة.');
+  $def=$this->definition($module);$data=$this->validateData($request,$def,$module,null);
   $item=$this->saveRecord($request,$def,$module,$data,null);
   Audit::record('created',$module,$item->id,'إضافة '.$def['singular']);
   return redirect()->route('modules.index',$module)->with('success','تمت الإضافة بنجاح.');
@@ -298,6 +353,10 @@ class ModuleController extends CompanyBaseController {
    $item->load(['units'=>fn($q)=>$q->withOccupancy()->withCount('leases')]);
    $total=$item->units->count();$occupied=$item->units->where('occupancy_status','occupied')->count();
    $available=$item->units->where('occupancy_status','available')->count();
+   $user=auth()->user();$company=\App\Support\Workspace::company();
+   foreach($item->units as $u){
+    $u->rent_label=PropertyAccess::canViewPrice($user,$item->id,'rent')?($company->money($u->monthly_rent).' / '.$u->rent_period_label):'🔒 غير مصرح';
+   }
    return view('modules.show-property',compact('item','module','total','occupied','available'));
   }
   $item->load(['tasks','expenses','property']);

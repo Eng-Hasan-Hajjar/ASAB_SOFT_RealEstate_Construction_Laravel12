@@ -115,7 +115,11 @@
             @elseif($field['type']==='select')
               <span class="status-pill">{{ $module==='units' && $column==='status' ? \App\Models\Unit::statusLabels()[$item->occupancy_status] : ($field['options'][(string)$item->{$column}] ?? $item->{$column} ?? '—') }}</span>
             @elseif($field['type']==='money')
-              <span class="money-text" dir="ltr">{{ \App\Support\Workspace::company()->money($item->{$column}) }}</span>
+              @if($module==='units' && $column==='monthly_rent' && !\App\Support\PropertyAccess::canViewPrice(auth()->user(),$item->property_id,'rent'))
+                <span class="money-text locked">🔒 غير مصرح بعرض السعر</span>
+              @else
+                <span class="money-text" dir="ltr">{{ \App\Support\Workspace::company()->money($item->{$column}) }}</span>
+              @endif
             @elseif($field['type']==='progress')
               <span class="progress-mini">{{ $item->{$column} }}%</span>
             @else

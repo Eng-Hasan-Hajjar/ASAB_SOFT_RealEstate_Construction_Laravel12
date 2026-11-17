@@ -3,6 +3,7 @@ namespace App\Http\Controllers;
 
 use App\Models\{Property,Unit,WorkspaceImage};
 use App\Services\WorkspaceGallery;
+use App\Support\PropertyAccess;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -13,6 +14,7 @@ final class PropertyExplorerController extends CompanyBaseController
         $data=$request->validate(['q'=>['nullable','string','max:120']]);
         $company=$this->companyId();
         $query=Property::where('company_id',$company);
+        PropertyAccess::scopeProperties($query, auth()->user());
         if (!empty($data['q'])) {
             $term='%'.trim($data['q']).'%';
             $query->where(fn($q)=>$q->where('name','like',$term)->orWhere('city','like',$term)->orWhere('district','like',$term));
@@ -25,7 +27,9 @@ final class PropertyExplorerController extends CompanyBaseController
     public function show(Request $request,int $property, WorkspaceGallery $gallery)
     {
         $company=$this->companyId();
-        $item=Property::where('company_id',$company)->findOrFail($property);
+        $itemQuery=Property::where('company_id',$company);
+        PropertyAccess::scopeProperties($itemQuery, auth()->user());
+        $item=$itemQuery->findOrFail($property);
         $data=$request->validate([
             'status'=>['nullable',Rule::in(array_keys(Unit::statusLabels()))],
             'type'=>['nullable',Rule::in(array_keys(config('modules.units.fields.type.options')))],

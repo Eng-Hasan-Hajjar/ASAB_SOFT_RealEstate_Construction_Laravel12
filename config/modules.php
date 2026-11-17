@@ -16,8 +16,10 @@ return [
  'units'=>['title'=>'الوحدات العقارية','singular'=>'وحدة','model'=>App\Models\Unit::class,'icon'=>'door','description'=>'الشقق والمحلات والمكاتب وتوافرها','fields'=>[
   'property_id'=>$r('العقار','properties',true),'code'=>$t('رقم / رمز الوحدة',true),'type'=>$s('نوع الوحدة',['apartment'=>'شقة','villa'=>'فيلا','office'=>'مكتب','shop'=>'محل','warehouse'=>'مستودع','other'=>'أخرى']),
   'floor'=>$n('الطابق'),'rooms'=>$n('الغرف'),'bathrooms'=>$n('الحمامات'),'area'=>$n('المساحة (م²)'),
-  'monthly_rent'=>$m('الإيجار الشهري',true),'status'=>$s('الحالة',['available'=>'متاحة','occupied'=>'مؤجرة','maintenance'=>'صيانة','inactive'=>'غير نشطة']),'description'=>$a('الملاحظات')],
-  'columns'=>['code','property_id','type','monthly_rent','status']],
+  'monthly_rent'=>$m('سعر الإيجار (حسب الدورية المحددة)',true),
+  'rent_period'=>$s('دورية الإيجار',['daily'=>'يومي','monthly'=>'شهري','yearly'=>'سنوي'],false),
+  'status'=>$s('الحالة',['available'=>'متاحة','occupied'=>'مؤجرة','maintenance'=>'صيانة','inactive'=>'غير نشطة']),'description'=>$a('الملاحظات')],
+  'columns'=>['code','property_id','type','monthly_rent','rent_period','status']],
  'contacts'=>['title'=>'العملاء والمستأجرون','singular'=>'عميل','model'=>App\Models\Contact::class,'icon'=>'users','description'=>'المستأجرون والملاك والمشترون','fields'=>[
   'name'=>$t('الاسم الكامل',true),'type'=>$s('النوع',['tenant'=>'مستأجر','owner'=>'مالك','buyer'=>'مشتري','supplier'=>'مورد','other'=>'آخر']),
   'phone'=>$t('الجوال'),'nationality'=>$t('الجنسية'),'identity_reference'=>$t('مرجع الهوية (اختياري، داخلي)'),'email'=>['label'=>'البريد الإلكتروني','type'=>'email'],'city'=>$t('المدينة'),

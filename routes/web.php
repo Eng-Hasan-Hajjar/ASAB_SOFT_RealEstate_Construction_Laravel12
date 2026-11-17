@@ -52,7 +52,10 @@ Route::middleware(['auth','active'])->group(function(){
   });
   Route::get('/invoices',[InvoiceController::class,'index'])->name('invoices.index');Route::get('/invoices/create',[InvoiceController::class,'create'])->name('invoices.create');Route::post('/invoices',[InvoiceController::class,'store'])->name('invoices.store');
   Route::get('/invoices/{invoice}',[InvoiceController::class,'show'])->name('invoices.show');Route::post('/invoices/{invoice}/payments',[InvoiceController::class,'pay'])->name('invoices.pay');
-  Route::middleware('role:company_admin,manager')->group(function(){Route::get('/staff',[StaffController::class,'index'])->name('staff.index');Route::post('/staff',[StaffController::class,'store'])->name('staff.store');Route::patch('/staff/{user}/toggle',[StaffController::class,'toggle'])->name('staff.toggle');});
+  Route::middleware('role:company_admin,manager')->group(function(){Route::get('/staff',[StaffController::class,'index'])->name('staff.index');Route::post('/staff',[StaffController::class,'store'])->name('staff.store');Route::patch('/staff/{user}/toggle',[StaffController::class,'toggle'])->name('staff.toggle');
+   Route::get('/staff/{user}/permissions',[StaffController::class,'permissions'])->whereNumber('user')->name('staff.permissions');
+   Route::put('/staff/{user}/permissions',[StaffController::class,'updatePermissions'])->whereNumber('user')->name('staff.permissions.update');
+  });
   Route::get('/listings',[MarketplaceController::class,'index'])->name('listings.index');
   Route::get('/listings/{property}/edit',[MarketplaceController::class,'edit'])->whereNumber('property')->name('listings.edit');
   Route::post('/listings/{property}/settings',[MarketplaceController::class,'save'])->whereNumber('property')->name('listings.save');
