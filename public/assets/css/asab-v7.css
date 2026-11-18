@@ -92,8 +92,16 @@
 :root[data-theme="dark"] #appShell .v6-state-reserved{--v6-tint:#392c4e;--v6-tint-border:#705794;--v6-ink:#e3d0ff}
 :root[data-theme="dark"] #appShell :is(.v6-state-maintenance,.v6-state-under_maintenance){--v6-tint:#382c1b;--v6-tint-border:#89662e;--v6-ink:#ffdb93}
 :root[data-theme="dark"] #appShell .v6-state-inactive{--v6-tint:#262e3b;--v6-tint-border:#4a586d;--v6-ink:#c6d4e9}
+:root[data-theme="dark"] #appShell .v6-state-unknown{--v6-tint:#3a331c;--v6-tint-border:#8a7536;--v6-ink:#f0da97}
 #appShell .data-table tbody tr.v6-row>td{background:var(--v6-tint);border-color:var(--v6-tint-border)}
 #appShell .v6-row .status-pill{color:var(--v6-ink)}
+/* Explorer redesign: quick-filter chips, legend and the quick-preview popover all use the shared
+   --ops-* tokens so neither theme ever pairs a light surface with light text (or the reverse). */
+#appShell .v6-chip{background:var(--ops-low);color:var(--ops-ink);border-color:var(--ops-outline)}
+#appShell .v6-legend{color:var(--ops-muted)}
+#appShell .v6-quickpreview{background:var(--ops-surface);color:var(--ops-ink);border-color:var(--ops-outline);box-shadow:var(--ops-elev)}
+#appShell .v6-quickpreview-meta dt{color:var(--ops-muted)}
+#appShell .v6-peek{background:var(--ops-surface);color:var(--v6-ink,var(--ops-ink))}
 :root[data-theme="dark"] #appShell :is(.finance-summary,.report-summary,.assistant-suggestions,.smart-filters,.listing-editor,.stats-panel,.marketplace-settings) :is(h2,h3,h4,strong,b,dt,dd){color:var(--ops-ink)}
 :root[data-theme="dark"] #appShell :is(.invoice-summary,.stat-foot,.table-toolbar,.table-panel,.sidebar-footer,.pagination-wrap,.pg-current,.pg-link,.list-avatar,.period-toolbar,.detail-panel,.form-actions,.details-list div,.doc-box){border-color:var(--ops-outline)}
 :root[data-theme="dark"] #appShell :is(.finance-account,.bank-card,.section-card,.detail-card,.module-card,.pagination-wrap,.pg-link,.pg-current,.form-actions,.detail-disclaimer,.filters-result,.details-list div){background:var(--ops-surface);color:var(--ops-ink)}
